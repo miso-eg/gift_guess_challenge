@@ -5,13 +5,177 @@ export const answers={yes:'YES',no:'NO',unknown:'分からない',neither:'ど�
 export function answerValue(v){if(v===true)return 'yes';if(v===false)return 'no';if(Object.hasOwn(answers,v))return v;throw Error('回答が不正です');}
 export const uid=()=>crypto.randomUUID();
 export const kinds={small:'小ヒント',medium:'中ヒント',free:'自由ヒント'};
-const initial=[
-['small','image','ハート形が含まれていますか？'],['small','image','星形が含まれていますか？'],['small','image','文字が描かれていますか？'],['small','image','リボンが描かれていますか？'],['small','image','赤色が使われていますか？'],['small','image','青色が使われていますか？'],['small','image','顔が描かれていますか？'],['small','image','丸い形が含まれていますか？'],['small','coin','コイン数は偶数ですか？'],['small','coin','コイン数は3桁ですか？'],['small','coin','コイン数の末尾は0ですか？'],['small','subjective','かわいいと思いますか？'],['small','subjective','おいしそうに見えますか？'],['small','subjective','強そうに見えますか？'],['small','subjective','プレゼントでもらったら嬉しいですか？'],['small','subjective','あたたかそうに見えますか？'],
-['medium','image','生き物が描かれていますか？'],['medium','image','食べ物・飲み物が描かれていますか？'],['medium','image','身につけるものが描かれていますか？'],['medium','image','乗り物が描かれていますか？'],['medium','image','植物が描かれていますか？'],['medium','image','人が描かれていますか？'],['medium','coin','コイン数は{n}以上ですか？',100],['medium','coin','コイン数は{n}以下ですか？',500],['medium','coin','コイン数は{n}以上ですか？',1000]
+const catalogVersion = 4;
+const maxCoins = 1e9;
+const extraDetails = [
+ ['gold','金色が使われていますか？'],
+ ['silver','銀色が使われていますか？'],
+ ['stripe','しま模様がありますか？'],
+ ['check','チェック柄がありますか？'],
+ ['triangle','三角形が含まれていますか？'],
+ ['crescent','三日月の形が含まれていますか？'],
+ ['drop','しずくの形が含まれていますか？'],
+ ['sparkle','光のきらめきが描かれていますか？'],
+ ['wings','羽や翼が描かれていますか？'],
+ ['rays','放射状に広がる線がありますか？'],
 ];
-export function defaults(){return{version:1,theme:'simple',title:'ギフト当てチャレンジ',description:'リスナー協力型！\n5回クリアで新イラスト公開！',mode:'coop',target:{image:samples.gift,coins:100,note:''},shareAnswer:false,clears:0,goal:5,showProgress:true,round:1,complete:false,winner:'',triggers:Object.keys(kinds).map(kind=>({kind,type:'gift',image:samples[{small:'heart',medium:'star',free:'clover'}[kind]],coins:0,condition:'',text:triggerDescriptions[kind]})),questions:initial.map(([kind,category,text,n],i)=>({id:'default-'+i,kind,category,text,n:n||0,enabled:true})),history:[],pending:null};}
+const extraMotifs = [
+ ['gift-box','プレゼント箱が描かれていますか？'],
+ ['music','楽器や音符が描かれていますか？'],
+ ['building','建物が描かれていますか？'],
+ ['weather','雲や雨など、天気に関するものが描かれていますか？'],
+ ['space','惑星やロケットなど、宇宙に関するものが描かれていますか？'],
+ ['sports','スポーツ用品が描かれていますか？'],
+ ['stationery','文房具が描かれていますか？'],
+ ['furniture','家具が描かれていますか？'],
+ ['jewel','宝石が描かれていますか？'],
+ ['electronics','スマートフォンやテレビなどの電化製品が描かれていますか？'],
+ ['tableware','お皿やカップなどの食器が描かれていますか？'],
+ ['landscape','山・海・川などの自然の風景が描かれていますか？'],
+];
+const catalog = [
+ ['default-0','small','image','ハート形が含まれていますか？'],
+ ['default-1','small','image','星形が含まれていますか？'],
+ ['default-2','small','image','文字が描かれていますか？'],
+ ['default-3','small','image','リボンが描かれていますか？'],
+ ['default-4','small','image','赤色が使われていますか？'],
+ ['default-5','small','image','青色が使われていますか？'],
+ ...['黄色','緑色','オレンジ色','ピンク色','紫色','白色','黒色','茶色'].map((color, index) =>
+  ['color-' + index, 'small', 'image', color + 'が使われていますか？']
+ ),
+ ['default-7','small','image','丸い形が含まれていますか？'],
+ ['default-11','small','subjective','かわいいと思いますか？'],
+ ['default-12','small','subjective','おいしそうに見えますか？'],
+ ['default-13','small','subjective','強そうに見えますか？'],
+ ['default-15','small','subjective','あたたかそうに見えますか？'],
+ ...extraDetails.map(([id,text]) => ['detail-' + id,'small','image',text]),
+ ['default-16','medium','image','生き物・キャラクターが描かれていますか？'],
+ ['default-17','medium','image','食べ物・飲み物が描かれていますか？'],
+ ['default-18','medium','image','身につけるものが描かれていますか？'],
+ ['default-19','medium','image','乗り物が描かれていますか？'],
+ ['default-20','medium','image','植物が描かれていますか？'],
+ ['default-21','medium','image','人が描かれていますか？'],
+ ...extraMotifs.map(([id,text]) => ['motif-' + id,'medium','image',text]),
+ ...[2,3,4,5].map(digits => [
+  digits === 3 ? 'default-9' : 'coin-digits-' + digits,
+  'medium',
+  'coin',
+  'コイン数は' + digits + '桁ですか？',
+  true,
+ ]),
+ ...[50,100,500,1000,2000,5000].map(coins => [
+  coins === 500 ? 'default-23' : 'coin-at-most-' + coins,
+  'medium',
+  'coin',
+  coins.toLocaleString('ja-JP') + 'コイン以下ですか？',
+  true,
+ ])
+];
+const standardQuestions = catalog.map(([id,kind,category,text]) => ({id,kind,category,text,n:0,enabled:true}));
+const fixedCoinQuestions = new Map(catalog.filter(entry => entry[4]).map(([id,,,text]) => [id,text]));
+export const isFixedCoinQuestion = q => fixedCoinQuestions.has(q.id);
+
+function migrateQuestions(questions, version) {
+ const replaced = new Map([
+  ['default-22','coin-at-most-100'],
+  ['default-24','coin-at-most-1000'],
+ ]);
+ const removed = new Map([
+  ['default-8','コイン数は偶数ですか？'],
+  ['default-14','プレゼントでもらったら嬉しいですか？'],
+ ]);
+ const removedInVersionFour = new Map([
+  ['default-6','顔が描かれていますか？'],
+  ['detail-gradient','色がなめらかに変わる部分がありますか？'],
+  ['detail-outline','モチーフに黒いふち取りがありますか？'],
+ ]);
+ const existing = new Map(questions.map(q => [q.id,q]));
+ const result = questions.flatMap(q => {
+  if (version < 4 && removedInVersionFour.get(q.id) === q.text) return [];
+  if (q.id === 'default-10' && q.text === 'コイン数の末尾は0ですか？') return [];
+  if (q.id === 'default-9') return [{...q,kind:'medium',category:'coin'}];
+  if (version >= 1) return [q];
+  if (removed.get(q.id) === q.text) return [];
+  if (replaced.has(q.id)) {
+   const id = replaced.get(q.id);
+   return existing.has(id) ? [] : [{...q,id,text:fixedCoinQuestions.get(id)}];
+  }
+  if (q.id === 'default-16' && q.text === '生き物が描かれていますか？') {
+   return [{...q,text:'生き物・キャラクターが描かれていますか？'}];
+  }
+  return [q];
+ });
+ const usedText = new Set(result.map(q => q.kind + ':' + normalizedQuestion(q.text)));
+ for (const q of standardQuestions) {
+  if (result.length >= 300) break;
+  const addedInVersionOne = q.id.startsWith('color-') || ['coin-at-most-50','coin-at-most-2000','coin-at-most-5000'].includes(q.id);
+  const addedInVersionTwo = q.id.startsWith('detail-') || q.id.startsWith('motif-');
+  const addedInVersionThree = q.id.startsWith('coin-digits-');
+  const shouldAdd = (version < 1 && addedInVersionOne) ||
+   (version < 2 && addedInVersionTwo) || (version < 3 && addedInVersionThree);
+  const key = q.kind + ':' + normalizedQuestion(q.text);
+  if (shouldAdd && !existing.has(q.id) && !usedText.has(key)) {
+   result.push({...q});
+   usedText.add(key);
+  }
+ }
+ // 標準の質問は新しい一覧順にし、追加された質問は元の順番を保つ。
+ const order = new Map(standardQuestions.map((q,index) => [q.id,index]));
+ return result.sort((a,b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity));
+}
+export function defaults(){return{version:1,theme:'simple',title:'ギフト当てチャレンジ',description:'リスナー協力型！\n5回クリアで新イラスト公開！',mode:'coop',target:{image:samples.gift,coins:100,note:''},shareAnswer:false,clears:0,goal:5,showProgress:true,round:1,complete:false,winner:'',triggers:Object.keys(kinds).map(kind=>({kind,type:'gift',image:samples[{small:'heart',medium:'star',free:'clover'}[kind]],coins:0,condition:'',text:triggerDescriptions[kind]})),questionCatalog:catalogVersion,questions:standardQuestions.map(q=>({...q})),history:[],pending:null};}
 export function questionText(q){return q.text.replaceAll('{n}',String(q.n));}
-export function available(s,kind){const used=new Set(s.history.map(h=>h.questionId));return s.questions.filter(q=>q.enabled&&q.kind===kind&&!used.has(q.id));}
+function normalizedQuestion(text) {
+ return text.normalize('NFKC').replace(/[\s?。]+/g, '');
+}
+
+function coinRange(question) {
+ const digits = /^コイン数は([2-5])桁(?:ですか|か)?$/.exec(question);
+ if (digits) {
+  const count = Number(digits[1]);
+  return [10 ** (count - 1), 10 ** count - 1];
+ }
+ const match = /^(?:コイン数は)?([\d,]+)(コイン)?(以上|以下|未満|超)(?:ですか|か)?$/.exec(question);
+ if (!match || (!match[2] && !question.startsWith('コイン数は'))) return null;
+ const coins = Number(match[1].replaceAll(',', ''));
+ if (!Number.isSafeInteger(coins) || coins > maxCoins) return null;
+ const comparison = match[3];
+ if (comparison === '以上' || comparison === '超') return [coins + (comparison === '超' ? 1 : 0), maxCoins];
+ return [0, coins - (comparison === '未満' ? 1 : 0)];
+}
+
+function filterCoinRanges(ranges, [min,max], yes) {
+ // 桁数のNOは、その桁数より下と上の両方が候補に残る。
+ return ranges.flatMap(([low,high]) => {
+  const parts = yes
+   ? [[Math.max(low,min),Math.min(high,max)]]
+   : [[low,Math.min(high,min-1)],[Math.max(low,max+1),high]];
+  return parts.filter(([start,end]) => start <= end);
+ });
+}
+
+export function available(s,kind) {
+ const used = new Set(s.history.map(h => h.questionId));
+ const answered = new Set();
+ let ranges = [[0,maxCoins]];
+ for (const hint of s.history) {
+  const answer = answerValue(hint.answer);
+  if (answer !== 'yes' && answer !== 'no') continue;
+  const question = normalizedQuestion(hint.text);
+  answered.add(question);
+  const range = coinRange(question);
+  if (range) ranges = filterCoinRanges(ranges, range, answer === 'yes');
+ }
+ return s.questions.filter(q => {
+  if (!q.enabled || q.kind !== kind || used.has(q.id)) return false;
+  const question = normalizedQuestion(questionText(q));
+  if (answered.has(question)) return false;
+  const range = coinRange(question);
+  if (!range || !ranges.length) return true;
+  return filterCoinRanges(ranges, range, true).length > 0 &&
+   filterCoinRanges(ranges, range, false).length > 0;
+ });
+}
 export function publicState(s){const copy=structuredClone(s);if(!s.shareAnswer)copy.target={image:'',coins:0,note:''};return copy;}
 const text=(v,max=2000)=>{if(typeof v!=='string'||v.length>max)throw Error('文字データが不正です');return v;};
 const num=(v,max=1e9)=>{if(!Number.isSafeInteger(v)||v<0||v>max)throw Error('数値データが不正です');return v;};
@@ -24,7 +188,10 @@ export function validate(s){
  if(!Array.isArray(s.triggers)||s.triggers.length!==3)throw Error('発動条件が不正です');
  out.triggers=s.triggers.map((t,i)=>{if(t.kind!==Object.keys(kinds)[i])throw Error('ヒント種別が不正です');const type=t.type??'gift';if(!['gift','custom'].includes(type))throw Error('発動条件の種類が不正です');return{kind:t.kind,type,image:image(t.image),...(t.imageEdit?{imageEdit:validateImageEdit(t.imageEdit)}:{}),coins:num(t.coins??0),condition:text(t.condition??'',180),text:triggerDescriptions[t.kind]};});
  if(!Array.isArray(s.questions)||s.questions.length>300)throw Error('質問は300件までです');const ids=new Set();
- out.questions=s.questions.map(q=>{text(q.id,80);if(ids.has(q.id)||!['small','medium'].includes(q.kind)||!['image','coin','subjective'].includes(q.category))throw Error('質問が不正です');ids.add(q.id);return{id:q.id,kind:q.kind,category:q.category,text:text(q.text,240),n:num(q.n),enabled:bool(q.enabled)};});
+ out.questions=s.questions.map(q=>{text(q.id,80);if(ids.has(q.id)||!['small','medium'].includes(q.kind)||!['image','coin','subjective'].includes(q.category))throw Error('質問が不正です');ids.add(q.id);return{id:q.id,kind:q.kind,category:q.category,text:fixedCoinQuestions.get(q.id)??text(questionText({...q,text:text(q.text,240),n:num(q.n??0)}),240),n:0,enabled:bool(q.enabled)};});
+ const previousCatalog = Number.isInteger(s.questionCatalog) ? s.questionCatalog : 0;
+ out.questionCatalog = catalogVersion;
+ if (previousCatalog < catalogVersion) out.questions = migrateQuestions(out.questions, previousCatalog);
  if(!Array.isArray(s.history)||s.history.length>1000)throw Error('履歴は1ラウンド1000件までです');
  out.history=s.history.map(h=>({id:text(h.id,80),questionId:text(h.questionId,80),kind:Object.hasOwn(kinds,h.kind)?h.kind:'free',text:text(h.text,240),answer:answerValue(h.answer),at:num(h.at,Number.MAX_SAFE_INTEGER)}));
  out.pending=s.pending?{id:text(s.pending.id,80),questionId:text(s.pending.questionId,80),kind:Object.hasOwn(kinds,s.pending.kind)?s.pending.kind:'free',text:text(s.pending.text,240)}:null;
