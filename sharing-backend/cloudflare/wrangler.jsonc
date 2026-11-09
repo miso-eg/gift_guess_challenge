@@ -1,0 +1,8 @@
+{
+  "name": "gift-guess-challenge-sharing",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "vars": { "ALLOWED_ORIGIN": "https://miso-eg.github.io" },
+  "d1_databases": [{ "binding": "DB", "database_name": "gift-guess-challenge", "database_id": "REPLACE_WITH_NEW_DATABASE_ID" }],
+  "triggers": { "crons": ["0 * * * *"] }
+}
